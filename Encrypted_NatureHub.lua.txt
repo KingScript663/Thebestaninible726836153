@@ -1,29 +1,59 @@
+--=== GUI SECTION ===--
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Player = Players.LocalPlayer
+local playerGui = Player:WaitForChild("PlayerGui")
 
--- Tạo GUI
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AbilityESP_GUI"
-screenGui.Parent = game:GetService("CoreGui")
+screenGui.Name = "CircleUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
 
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 120, 0, 40)
-toggleButton.Position = UDim2.new(0, 20, 0, 100)
-toggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-toggleButton.TextColor3 = Color3.new(1, 1, 1)
-toggleButton.Font = Enum.Font.GothamBold
-toggleButton.TextSize = 14
-toggleButton.Text = "ESP: OFF"
-toggleButton.Parent = screenGui
+local circle = Instance.new("Frame")
+circle.Name = "Circle"
+circle.Size = UDim2.new(0, 160, 0, 45)
+circle.Position = UDim2.new(0, 20, 0, 20)
+circle.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+circle.BackgroundTransparency = 0.3
+circle.BorderSizePixel = 0
+circle.Active = true
+circle.Draggable = true
+circle.Parent = screenGui
 
--- Biến
-local enabled = false
+Instance.new("UICorner", circle).CornerRadius = UDim.new(0, 8)
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(0, 0, 0)
+stroke.Parent = circle
+
+local label = Instance.new("TextLabel")
+label.Name = "GetGunLabel"
+label.Parent = circle
+label.Size = UDim2.new(0.8, 0, 0.6, 0)
+label.Position = UDim2.new(0.1, 0, 0.2, 0)
+label.BackgroundTransparency = 1
+label.Text = "Ability ESP: Off"
+label.TextColor3 = Color3.new(1, 1, 1)
+label.TextScaled = true
+label.Font = Enum.Font.GothamSemibold
+
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 20, 0, 20)
+closeButton.Position = UDim2.new(1, -18, 0, 0)
+closeButton.BackgroundTransparency = 1
+closeButton.Text = "X"
+closeButton.TextColor3 = Color3.new(1, 1, 1)
+closeButton.TextScaled = true
+closeButton.Font = Enum.Font.GothamBold
+closeButton.Parent = circle
+
+--=== ESP SECTION ===--
 local billboardLabels = {}
-local connection
+local Connections_Manager = {}
+local abilityESPEnabled = false
 
--- Tạo label trên đầu player khác
-local function createBillboard(p)
+local function createBillboardGui(p)
 	local character = p.Character
 	while not character or not character.Parent do
 		task.wait()
@@ -31,85 +61,91 @@ local function createBillboard(p)
 	end
 
 	local head = character:WaitForChild("Head")
-	if billboardLabels[p] then
+
+	if billboardLabels[p] and billboardLabels[p].gui then
 		billboardLabels[p].gui:Destroy()
 	end
 
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "AbilityESP"
-	billboard.Adornee = head
-	billboard.Size = UDim2.new(0, 200, 0, 25)
-	billboard.StudsOffset = Vector3.new(0, 3.5, 0)
-	billboard.AlwaysOnTop = true
-	billboard.Parent = head
+	local billboardGui = Instance.new("BillboardGui")
+	billboardGui.Name = "AbilityESP_Billboard"
+	billboardGui.Adornee = head
+	billboardGui.Size = UDim2.new(0, 200, 0, 25)
+	billboardGui.StudsOffset = Vector3.new(0, 3.5, 0)
+	billboardGui.AlwaysOnTop = true
+	billboardGui.Parent = head
 
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, 0, 1, 0)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBold
-	label.TextColor3 = Color3.fromRGB(255, 255, 255)
-	label.TextStrokeTransparency = 0.6
-	label.TextSize = 14
-	label.TextWrapped = true
-	label.TextXAlignment = Enum.TextXAlignment.Center
-	label.TextYAlignment = Enum.TextYAlignment.Center
-	label.Text = ""
-	label.Visible = false
-	label.Parent = billboard
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Size = UDim2.new(1, 0, 1, 0)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Font = Enum.Font.GothamBold
+	textLabel.TextColor3 = Color3.new(1, 1, 1)
+	textLabel.TextStrokeTransparency = 0.6
+	textLabel.TextSize = 14
+	textLabel.TextXAlignment = Enum.TextXAlignment.Center
+	textLabel.TextYAlignment = Enum.TextYAlignment.Center
+	textLabel.TextWrapped = true
+	textLabel.Text = ""
+	textLabel.Visible = false
+	textLabel.Parent = billboardGui
 
 	billboardLabels[p] = {
-		gui = billboard,
-		label = label
+		gui = billboardGui,
+		label = textLabel
 	}
 
 	local humanoid = character:FindFirstChild("Humanoid")
 	if humanoid then
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 		humanoid.Died:Connect(function()
-			if billboard then billboard:Destroy() end
+			textLabel.Visible = false
+			textLabel.Text = ""
+			billboardGui:Destroy()
 			billboardLabels[p] = nil
 		end)
 	end
 end
 
--- Setup cho người chơi hiện có
-for _, p in ipairs(Players:GetPlayers()) do
+for _, p in Players:GetPlayers() do
 	if p ~= Player then
 		p.CharacterAdded:Connect(function()
-			createBillboard(p)
+			createBillboardGui(p)
 		end)
 		if p.Character then
-			createBillboard(p)
+			createBillboardGui(p)
 		end
 	end
 end
 
--- Người chơi mới
-Players.PlayerAdded:Connect(function(p)
-	if p ~= Player then
-		p.CharacterAdded:Connect(function()
-			createBillboard(p)
+Players.PlayerAdded:Connect(function(newPlayer)
+	if newPlayer ~= Player then
+		newPlayer.CharacterAdded:Connect(function()
+			createBillboardGui(newPlayer)
 		end)
 	end
 end)
 
--- Update label mỗi frame
-local function updateESP(state)
+local function toggleESP(state)
+	abilityESPEnabled = state
+	label.Text = state and "Ability ESP: On" or "Ability ESP: Off"
+
 	if state then
-		connection = RunService.Heartbeat:Connect(function()
+		Connections_Manager["AbilityESP"] = RunService.Heartbeat:Connect(function()
 			for p, data in pairs(billboardLabels) do
+				local label = data.label
 				if p.Character and p.Character:FindFirstChild("Head") then
 					local ability = p:GetAttribute("EquippedAbility")
-					data.label.Text = ability and (p.DisplayName .. " [" .. ability .. "]") or p.DisplayName
-					data.label.Visible = true
+					label.Text = ability and (p.DisplayName .. " [" .. ability .. "]") or p.DisplayName
+					label.Visible = true
 				else
-					data.label.Visible = false
+					label.Visible = false
+					label.Text = ""
 				end
 			end
 		end)
 	else
-		if connection then
-			connection:Disconnect()
-			connection = nil
+		if Connections_Manager["AbilityESP"] then
+			Connections_Manager["AbilityESP"]:Disconnect()
+			Connections_Manager["AbilityESP"] = nil
 		end
 		for _, data in pairs(billboardLabels) do
 			data.label.Visible = false
@@ -118,27 +154,21 @@ local function updateESP(state)
 	end
 end
 
--- Toggle nút
-toggleButton.MouseButton1Click:Connect(function()
-	enabled = not enabled
-	toggleButton.Text = "ESP: " .. (enabled and "ON" or "OFF")
-	updateESP(enabled)
+circle.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		abilityESPEnabled = not abilityESPEnabled
+		toggleESP(abilityESPEnabled)
+	end
 end)
 
--- 🧨 Đây là hàm bạn gọi để "xóa nút và dừng ESP"
-function offbutton()
-	if connection then
-		connection:Disconnect()
-		connection = nil
+closeButton.MouseButton1Click:Connect(function()
+	if Connections_Manager["AbilityESP"] then
+		Connections_Manager["AbilityESP"]:Disconnect()
+		Connections_Manager["AbilityESP"] = nil
 	end
 	for _, data in pairs(billboardLabels) do
 		data.label.Visible = false
 		data.label.Text = ""
 	end
-	if screenGui then
-		screenGui:Destroy()
-	end
-end
-
--- ✅ Gán vào _G để gọi từ script khác
-_G.offbutton = offbutton
+	screenGui:Destroy()
+end)
